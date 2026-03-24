@@ -81,8 +81,9 @@ npm run test:watch
 
 ## API Endpoints
 
-### Health Check
-- `GET /health` - Service health status
+### Health Checks
+- `GET /health` - Service health status (liveness)
+- `GET /ready` - Readiness probe for Kubernetes (checks database and redis)
 
 ### Transactions
 - `POST /api/transactions/deposit` - Deposit from mobile money to Stellar
