@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   phone_number VARCHAR(20) NOT NULL,
   provider VARCHAR(20) NOT NULL,
   stellar_address VARCHAR(56) NOT NULL,
-  status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'completed', 'failed')),
+  status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'completed', 'failed', 'cancelled')),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -18,4 +18,4 @@ CREATE INDEX idx_transactions_reference_number ON transactions(reference_number)
 
 -- Tags: array of short lowercase strings for categorization (e.g. "refund", "priority", "verified")
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}';
-CREATE INDEX idx_transactions_tags ON transactions USING GIN (tags);
+CREATE INDEX IF NOT EXISTS idx_transactions_tags ON transactions USING GIN (tags);

@@ -15,12 +15,14 @@ import {
   haltOnTimedout,
   timeoutErrorHandler,
 } from "./middleware/timeout";
+import { responseTime } from "./middleware/responseTime";
 import {
   createQueueDashboard,
   getQueueHealth,
   pauseQueueEndpoint,
   resumeQueueEndpoint,
 } from "./queue";
+import { startJobs } from "./jobs/scheduler";
 
 import { register } from "./utils/metrics";
 import { metricsMiddleware } from "./middleware/metrics";
@@ -42,6 +44,7 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 app.use(limiter);
+app.use(responseTime);
 
 // Prometheus metrics endpoint
 app.get("/metrics", async (req, res) => {
@@ -136,4 +139,5 @@ app.use("/admin/queues", queueRouter);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  startJobs();
 });

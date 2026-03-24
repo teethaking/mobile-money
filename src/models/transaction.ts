@@ -1,6 +1,13 @@
 import { pool } from "../config/database";
 import { generateReferenceNumber } from "../utils/referenceGenerator";
 
+export enum TransactionStatus {
+  Pending = "pending",
+  Completed = "completed",
+  Failed = "failed",
+  Cancelled = "cancelled",
+}
+
 const MAX_TAGS = 10;
 // Tags must be lowercase alphanumeric words, hyphens allowed (e.g. "refund", "high-priority")
 const TAG_REGEX = /^[a-z0-9-]+$/;
@@ -21,7 +28,7 @@ export interface Transaction {
   phoneNumber: string;
   provider: string;
   stellarAddress: string;
-  status: "pending" | "completed" | "failed";
+  status: TransactionStatus;
   tags: string[];
   createdAt: Date;
 }
@@ -60,7 +67,7 @@ export class TransactionModel {
     return result.rows[0] || null;
   }
 
-  async updateStatus(id: string, status: string): Promise<void> {
+  async updateStatus(id: string, status: TransactionStatus): Promise<void> {
     await pool.query("UPDATE transactions SET status = $1 WHERE id = $2", [
       status,
       id,
