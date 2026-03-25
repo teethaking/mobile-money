@@ -6,8 +6,10 @@ import {
   getTransactionHandler,
   updateNotesHandler,
   searchTransactionsHandler,
+  listTransactionsHandler,
 } from "../../controllers/transactionController";
 import { TimeoutPresets, haltOnTimedout } from "../../middleware/timeout";
+import { validateTransactionFilters } from "../../utils/transactionFilters";
 
 export const transactionRoutesV1 = Router();
 
@@ -34,6 +36,19 @@ transactionRoutesV1.post(
     next();
   },
   withdrawHandler
+);
+
+// List transactions with status filtering and pagination
+transactionRoutesV1.get(
+  "/",
+  TimeoutPresets.quick,
+  haltOnTimedout,
+  validateTransactionFilters,
+  (req: VersionedRequest, res, next) => {
+    req.apiVersion = "v1";
+    next();
+  },
+  listTransactionsHandler,
 );
 
 // Get specific transaction
