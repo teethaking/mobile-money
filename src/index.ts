@@ -17,6 +17,7 @@ import {
   timeoutErrorHandler,
 } from "./middleware/timeout";
 import { responseTime } from "./middleware/responseTime";
+import { requestId } from "./middleware/requestId";
 import {
   createQueueDashboard,
   getQueueHealth,
@@ -70,6 +71,7 @@ app.use(
 );
 app.use(limiter);
 app.use(responseTime);
+app.use(requestId);
 
 // Health & readiness
 app.get("/health", (req, res) =>
@@ -163,7 +165,7 @@ app.use(errorHandler);
 connectRedis()
   .then(() => {
     // Only log if not in test mode to keep test output clean
-    if (process.env.NODE_ENV !== 'test') {
+    if (process.env.NODE_ENV !== "test") {
       console.log("Redis initialized");
     }
   })
@@ -178,7 +180,7 @@ app.use("/admin/queues", queueRouter);
 
 // --- START SERVER LOGIC ---
 // We check if we are in a test environment to prevent port collisions
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== "test") {
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }
 

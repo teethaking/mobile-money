@@ -32,6 +32,7 @@
   "dependencies": {
     "@bull-board/api": "^6.20.6",
     "@bull-board/express": "^6.20.6",
+    "@types/uuid": "^11.0.0",
     "apollo-server-core": "^3.13.0",
     "apollo-server-express": "^3.13.0",
     "axios": "^1.6.2",
@@ -54,6 +55,7 @@
     "redis": "^4.6.12",
     "redlock": "^5.0.0-beta.2",
     "stellar-sdk": "^11.3.0",
+    "uuid": "^13.0.0",
     "ws": "^8.18.0",
     "zod": "^4.3.6"
   },
