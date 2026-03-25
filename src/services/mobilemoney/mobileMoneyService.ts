@@ -1,5 +1,5 @@
 import { MTNProvider } from "./providers/mtn";
-import { AirtelProvider } from "./providers/airtel";
+import { AirtelService } from "./providers/airtel";
 import { OrangeProvider } from "./providers/orange";
 import { transactionTotal, transactionErrorsTotal } from "../../utils/metrics";
 
@@ -28,9 +28,9 @@ export class MobileMoneyService {
   private providers: Map<string, MobileMoneyProvider>;
 
   constructor() {
-    this.providers = new Map([
+    this.providers = new Map<string, MobileMoneyProvider>([
       ["mtn", new MTNProvider()],
-      ["airtel", new AirtelProvider()],
+      ["airtel", new AirtelService()],
       ["orange", new OrangeProvider()],
     ]);
   }

@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
@@ -7,12 +7,22 @@ import dotenv from "dotenv";
 import { transactionRoutes } from "./routes/transactions";
 import { bulkRoutes } from "./routes/bulk";
 import { transactionDisputeRoutes, disputeRoutes } from "./routes/disputes";
+import { statsRoutes } from "./routes/stats";
 import { errorHandler } from "./middleware/errorHandler";
 import { connectRedis, redisClient } from "./config/redis";
 import { pool } from "./config/database";
 import { globalTimeout, haltOnTimedout, timeoutErrorHandler } from "./middleware/timeout";
 import { responseTime } from "./middleware/responseTime";
 import { createQueueDashboard, getQueueHealth, pauseQueueEndpoint, resumeQueueEndpoint } from "./queue";
+import {
+  createQueueDashboard,
+  getQueueHealth,
+  pauseQueueEndpoint,
+  resumeQueueEndpoint,
+} from "./queue";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { startJobs } from "./jobs/scheduler";
+
 import { register } from "./utils/metrics";
 import { metricsMiddleware } from "./middleware/metrics";
 
@@ -21,10 +31,20 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Rate limiter
+// Rate limiter configuration
+const RATE_LIMIT_WINDOW_MS = parseInt(
+  process.env.RATE_LIMIT_WINDOW_MS || "900000",
+); // 15 minutes
+const RATE_LIMIT_MAX_REQUESTS = parseInt(
+  process.env.RATE_LIMIT_MAX_REQUESTS || "100",
+);
+
 const limiter = rateLimit({
   windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
   max: Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  windowMs: RATE_LIMIT_WINDOW_MS, // 15 minutes
+  max: RATE_LIMIT_MAX_REQUESTS,
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -33,12 +53,36 @@ const limiter = rateLimit({
 app.use(metricsMiddleware);
 app.use(helmet());
 app.use(cors());
-app.use(express.json());
+
+// --- Updated: JSON body parser with size limit ---
+app.use(
+  express.json({
+    limit: process.env.REQUEST_SIZE_LIMIT || "10mb", // Default 10mb
+  })
+);
+
+// --- Optional: urlencoded parser with same limit ---
+app.use(
+  express.urlencoded({
+    limit: process.env.REQUEST_SIZE_LIMIT || "10mb",
+    extended: true,
+  })
+);
+
 app.use(limiter);
 app.use(responseTime);
 
 // Health & readiness
 app.get("/health", (req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));
+
+// Basic health check
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+/**
+ * Readiness probe (DB + Redis)
+ */
 
 app.get("/ready", async (req, res) => {
   const checks: Record<string, string> = { database: "down", redis: "down" };
@@ -81,11 +125,23 @@ app.use("/api/transactions", transactionRoutes);
 app.use("/api/transactions", transactionDisputeRoutes);
 app.use("/api/transactions/bulk", bulkRoutes);
 app.use("/api/disputes", disputeRoutes);
+app.use("/api/stats", statsRoutes);
 
 // Queue endpoints
 app.get("/health/queue", getQueueHealth);
 app.post("/admin/queues/pause", pauseQueueEndpoint);
 app.post("/admin/queues/resume", resumeQueueEndpoint);
+
+// --- NEW: Global handler for payload too large ---
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  if (err.type === "entity.too.large") {
+    return res.status(413).json({
+      error: "Payload Too Large",
+      message: `Request exceeds the maximum size of ${process.env.REQUEST_SIZE_LIMIT || "10mb"}`,
+    });
+  }
+  next(err);
+});
 
 // Error handlers
 app.use(timeoutErrorHandler);
@@ -115,4 +171,12 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // Export the app instance for Supertest integration tests
+export default app;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(
+    `Rate limit: ${RATE_LIMIT_MAX_REQUESTS} requests per ${RATE_LIMIT_WINDOW_MS / 1000}s`,
+  );
+});
+
 export default app;

@@ -28,7 +28,9 @@ class LockManager {
       automaticExtensionThreshold: 500,
     };
 
-    this.redlock = new Redlock([redisClient] as any, settings);
+    // Type assertion needed for Redlock compatibility with ioredis
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.redlock = new Redlock([redisClient as any], settings);
 
     this.redlock.on("error", (error) => {
       console.error("Redlock error:", error);
@@ -137,14 +139,16 @@ class LockManager {
     ttl: number = this.defaultTTL,
   ): Promise<Lock | null> {
     try {
-      const noRetryRedlock = new Redlock([redisClient] as any, {
+      // Type assertion needed for Redlock compatibility with ioredis
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const noRetryRedlock = new Redlock([redisClient as any], {
         retryCount: 0,
       });
       const lock = await noRetryRedlock.acquire([`locks:${resource}`], ttl);
       console.log(`Lock acquired (no retry): ${resource}`);
       return lock;
-    } catch (error) {
-      console.log(`Lock not available: ${resource}`);
+    } catch (err) {
+      console.log(`Lock not available: ${resource}`, err);
       return null;
     }
   }

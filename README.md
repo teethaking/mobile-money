@@ -105,11 +105,11 @@ The system enforces daily transaction limits based on user KYC (Know Your Custom
 
 ### KYC Levels and Daily Limits
 
-| KYC Level | Daily Limit | Description |
-|-----------|-------------|-------------|
-| Unverified | 10,000 XAF | Default level for new users |
-| Basic | 100,000 XAF | Requires basic identity verification |
-| Full | 1,000,000 XAF | Requires complete identity verification |
+| KYC Level  | Daily Limit   | Description                             |
+| ---------- | ------------- | --------------------------------------- |
+| Unverified | 10,000 XAF    | Default level for new users             |
+| Basic      | 100,000 XAF   | Requires basic identity verification    |
+| Full       | 1,000,000 XAF | Requires complete identity verification |
 
 ### How Limits Are Enforced
 
@@ -139,6 +139,29 @@ If not specified, the system uses the default values shown above.
 
 When a transaction is rejected due to limit exceeded, the error response includes your current KYC level, remaining limit, and upgrade suggestions.
 
+## Git Hooks
+
+This project uses [Husky](https://typicode.github.io/husky/) to enforce code quality via Git hooks.
+
+### Pre-commit
+
+A pre-commit hook is configured to run before every commit. It executes:
+
+- `npm run lint`: Checks for linting errors.
+- `npm run type-check`: Verifies TypeScript types.
+- `npm test`: Runs the test suite.
+- `npx lint-staged`: Automatically formats staged files.
+
+If any of these checks fail, the commit will be rejected.
+
+### Bypassing Hooks
+
+If you need to bypass the pre-commit hooks (e.g., for a WIP commit), you can use the `--no-verify` flag:
+
+```bash
+git commit -m "Your message" --no-verify
+```
+
 ## API Endpoints
 
 ### Health Checks
@@ -152,7 +175,15 @@ When a transaction is rejected due to limit exceeded, the error response include
 - `POST /api/transactions/withdraw` - Withdraw from Stellar to mobile money
 - `GET /api/transactions/:id` - Get transaction status
 
+### Statistics & Metrics
+
+- `GET /api/stats` - Get system-wide statistics (Total transactions, success rate, total volume, active users, and volume by provider).
+- **Authentication**: Requires a valid administrative API key in the `X-API-Key` header.
+- **Cache**: Results are cached for 15 minutes.
+- **Filters**: Supports `startDate` and `endDate` query parameters (ISO format).
+
 ### GraphQL
+
 - `POST /graphql` (and Playground at `GET /graphql` in development)
 - See [docs/GRAPHQL.md](docs/GRAPHQL.md) for authentication, schema notes, and examples
 

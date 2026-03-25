@@ -30,6 +30,8 @@ export interface Transaction {
   stellarAddress: string;
   status: TransactionStatus;
   tags: string[];
+  notes?: string;
+  admin_notes?: string;
   createdAt: Date;
 }
 
@@ -42,8 +44,8 @@ export class TransactionModel {
     const referenceNumber = await generateReferenceNumber();
 
     const result = await pool.query(
-      `INSERT INTO transactions (reference_number, type, amount, phone_number, provider, stellar_address, status, tags)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO transactions (reference_number, type, amount, phone_number, provider, stellar_address, status, tags, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
       [
         referenceNumber,
@@ -54,6 +56,7 @@ export class TransactionModel {
         data.stellarAddress,
         data.status,
         tags,
+        data.notes ?? null,
       ],
     );
     return result.rows[0];
@@ -72,7 +75,7 @@ export class TransactionModel {
     const capped = Math.min(Math.max(limit, 1), 100);
     const off = Math.max(offset, 0);
     const result = await pool.query(
-      'SELECT * FROM transactions ORDER BY created_at DESC LIMIT $1 OFFSET $2',
+      "SELECT * FROM transactions ORDER BY created_at DESC LIMIT $1 OFFSET $2",
       [capped, off],
     );
     return result.rows;
@@ -149,14 +152,50 @@ export class TransactionModel {
    * @param since - The start date for the time window
    * @returns Array of completed transactions ordered by created_at DESC
    */
-  async findCompletedByUserSince(userId: string, since: Date): Promise<Transaction[]> {
+  async findCompletedByUserSince(
+    userId: string,
+    since: Date,
+  ): Promise<Transaction[]> {
     const result = await pool.query(
       `SELECT * FROM transactions 
        WHERE user_id = $1 
        AND status = 'completed' 
        AND created_at >= $2
        ORDER BY created_at DESC`,
-      [userId, since]
+      [userId, since],
+    );
+    return result.rows;
+  }
+
+  async updateNotes(id: string, notes: string): Promise<Transaction | null> {
+    if (notes.length > 1000)
+      throw new Error("Notes cannot exceed 1000 characters");
+    const result = await pool.query(
+      "UPDATE transactions SET notes = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *",
+      [notes, id],
+    );
+    return result.rows[0] || null;
+  }
+
+  async updateAdminNotes(
+    id: string,
+    adminNotes: string,
+  ): Promise<Transaction | null> {
+    if (adminNotes.length > 1000)
+      throw new Error("Admin notes cannot exceed 1000 characters");
+    const result = await pool.query(
+      "UPDATE transactions SET admin_notes = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *",
+      [adminNotes, id],
+    );
+    return result.rows[0] || null;
+  }
+
+  async searchByNotes(query: string): Promise<Transaction[]> {
+    const result = await pool.query(
+      `SELECT * FROM transactions 
+       WHERE to_tsvector('english', COALESCE(notes, '') || ' ' || COALESCE(admin_notes, '')) @@ plainto_tsquery('english', $1)
+       ORDER BY created_at DESC`,
+      [query],
     );
     return result.rows;
   }

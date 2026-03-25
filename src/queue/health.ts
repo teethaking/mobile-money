@@ -19,7 +19,8 @@ export async function getQueueHealth(req: Request, res: Response) {
         paused: stats.isPaused,
       },
     });
-  } catch (error) {
+  } catch (err) {
+    console.error('Failed to fetch queue health:', err);
     res.status(500).json({ error: "Failed to fetch queue health" });
   }
 }
@@ -28,7 +29,8 @@ export async function pauseQueueEndpoint(req: Request, res: Response) {
   try {
     await transactionQueue.pause();
     res.json({ success: true, message: "Queue paused" });
-  } catch (error) {
+  } catch (err) {
+    console.error('Failed to pause queue:', err);
     res.status(500).json({ error: "Failed to pause queue" });
   }
 }
@@ -37,7 +39,8 @@ export async function resumeQueueEndpoint(req: Request, res: Response) {
   try {
     await transactionQueue.resume();
     res.json({ success: true, message: "Queue resumed" });
-  } catch (error) {
+  } catch (err) {
+    console.error('Failed to resume queue:', err);
     res.status(500).json({ error: "Failed to resume queue" });
   }
 }

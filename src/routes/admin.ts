@@ -1,19 +1,36 @@
 import { Router, Request, Response, NextFunction } from "express";
+import { updateAdminNotesHandler } from "../controllers/transactionController";
 
 const router = Router();
+
+interface User {
+  id: string;
+  role: string;
+  locked?: boolean;
+  [key: string]: unknown;
+}
+
+interface Transaction {
+  id: string;
+  [key: string]: unknown;
+}
+
+interface AuthRequest extends Request {
+  user?: User;
+}
 
 /**
  * Mock services (replace with real DB/services)
  */
-const users: any[] = [];
-const transactions: any[] = [];
+const users: User[] = [];
+const transactions: Transaction[] = [];
 
 /**
  * Middleware: Require Admin Role
  */
 const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
   // Assume req.user is set by auth middleware
-  const user = (req as any).user;
+  const user = (req as AuthRequest).user;
 
   if (!user || user.role !== "admin") {
     return res.status(403).json({ message: "Admin access required" });
@@ -28,7 +45,7 @@ const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
 const logAdminAction = (action: string) => {
   return (req: Request, res: Response, next: NextFunction) => {
     console.log(`[ADMIN ACTION] ${action}`, {
-      adminId: (req as any).user?.id,
+      adminId: (req as AuthRequest).user?.id,
       method: req.method,
       path: req.originalUrl,
       body: req.body,
@@ -41,7 +58,7 @@ const logAdminAction = (action: string) => {
 /**
  * Helper: Pagination
  */
-const paginate = (data: any[], page: number, limit: number) => {
+const paginate = <T>(data: T[], page: number, limit: number) => {
   const start = (page - 1) * limit;
   const end = start + limit;
 
@@ -74,7 +91,7 @@ router.get(
     const result = paginate(users, page, limit);
 
     res.json(result);
-  }
+  },
 );
 
 // GET /api/admin/users/:id
@@ -90,7 +107,7 @@ router.get(
     }
 
     res.json(user);
-  }
+  },
 );
 
 // PUT /api/admin/users/:id
@@ -108,7 +125,7 @@ router.put(
     Object.assign(user, req.body);
 
     res.json({ message: "User updated", user });
-  }
+  },
 );
 
 // POST /api/admin/users/:id/unlock
@@ -126,7 +143,7 @@ router.post(
     user.locked = false;
 
     res.json({ message: "User account unlocked" });
-  }
+  },
 );
 
 /**
@@ -147,7 +164,7 @@ router.get(
     const result = paginate(transactions, page, limit);
 
     res.json(result);
-  }
+  },
 );
 
 // PUT /api/admin/transactions/:id
@@ -165,7 +182,15 @@ router.put(
     Object.assign(tx, req.body);
 
     res.json({ message: "Transaction updated", transaction: tx });
-  }
+  },
+);
+
+// PATCH /api/admin/transactions/:id/notes
+router.patch(
+  "/transactions/:id/notes",
+  requireAdmin,
+  logAdminAction("UPDATE_TRANSACTION_ADMIN_NOTES"),
+  updateAdminNotesHandler,
 );
 
 export const adminRoutes = router;
