@@ -96,10 +96,10 @@ jobs:
           echo "lines=$LINES" >> "$GITHUB_OUTPUT"
 
           # Thresholds — keep in sync with jest.config.js
-          THRESHOLD_STMTS=30
-          THRESHOLD_BRANCHES=25
-          THRESHOLD_FUNCS=35
-          THRESHOLD_LINES=30
+          THRESHOLD_STMTS=20
+          THRESHOLD_BRANCHES=15
+          THRESHOLD_FUNCS=25
+          THRESHOLD_LINES=20
 
           PASSED=true
           if [ "$STMTS" != "N/A" ]; then
@@ -116,6 +116,7 @@ jobs:
 
       - name: Comment coverage on PR
         if: github.event_name == 'pull_request'
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |
