@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from "express";
+import { generateToken } from "../auth/jwt";
 import { updateAdminNotesHandler } from "../controllers/transactionController";
 import { MobileMoneyService } from "../services/mobilemoney/mobileMoneyService";
 import { getQueueStats } from "../queue/transactionQueue";
@@ -6,6 +7,10 @@ import { redisClient } from "../config/redis";
 import { checkReplicaHealth } from "../config/database";
 
 const router = Router();
+const IMPERSONATION_TOKEN_EXPIRES_IN = "15m";
+const IMPERSONATION_TOKEN_TTL_MS = 15 * 60 * 1000;
+const READ_ONLY_IMPERSONATION_MESSAGE =
+  "This token is read-only and cannot be used for mutations.";
 
 interface User {
   id: string;
@@ -29,6 +34,40 @@ interface AuthRequest extends Request {
 const users: User[] = [];
 const transactions: Transaction[] = [];
 
+const isAdminRole = (role?: string) =>
+  role === "admin" || role === "super-admin";
+
+const isSuperAdminRole = (role?: string) => role === "super-admin";
+
+const buildAuditContext = (req: Request) => {
+  const authReq = req as AuthRequest;
+
+  return {
+    actorUserId: authReq.user?.id,
+    actorRole: authReq.user?.role,
+    method: req.method,
+    path: req.originalUrl,
+    ip: req.ip,
+    userAgent: req.get("user-agent"),
+    timestamp: new Date().toISOString(),
+  };
+};
+
+const logImpersonationAuditEvent = (
+  event:
+    | "IMPERSONATION_TOKEN_ISSUED"
+    | "IMPERSONATION_TOKEN_DENIED"
+    | "IMPERSONATION_TOKEN_REJECTED",
+  req: Request,
+  details: Record<string, unknown>,
+) => {
+  console.log("[ADMIN IMPERSONATION]", {
+    event,
+    ...buildAuditContext(req),
+    ...details,
+  });
+};
+
 /**
  * Middleware: Require Admin Role
  */
@@ -36,8 +75,27 @@ const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
   // Assume req.user is set by auth middleware
   const user = (req as AuthRequest).user;
 
-  if (!user || user.role !== "admin") {
+  if (!user || !isAdminRole(user.role)) {
     return res.status(403).json({ message: "Admin access required" });
+  }
+
+  next();
+};
+
+const requireSuperAdmin = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  const user = (req as AuthRequest).user;
+
+  if (!user || !isSuperAdminRole(user.role)) {
+    logImpersonationAuditEvent("IMPERSONATION_TOKEN_DENIED", req, {
+      reason: "super_admin_required",
+    });
+    return res.status(403).json({
+      message: "Super-admin access required",
+    });
   }
 
   next();
@@ -111,6 +169,99 @@ router.get(
     }
 
     res.json(user);
+  },
+);
+
+// POST /api/admin/users/:id/impersonation-token
+router.post(
+  "/users/:id/impersonation-token",
+  requireAdmin,
+  requireSuperAdmin,
+  (req: Request, res: Response) => {
+    const actor = (req as AuthRequest).user;
+    const targetUser = users.find((u) => u.id === req.params.id);
+    const reason =
+      typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
+
+    if (!targetUser) {
+      logImpersonationAuditEvent("IMPERSONATION_TOKEN_REJECTED", req, {
+        targetUserId: req.params.id,
+        reason: "target_user_not_found",
+      });
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!actor) {
+      logImpersonationAuditEvent("IMPERSONATION_TOKEN_REJECTED", req, {
+        targetUserId: targetUser.id,
+        reason: "missing_actor_context",
+      });
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    if (actor.id === targetUser.id) {
+      logImpersonationAuditEvent("IMPERSONATION_TOKEN_REJECTED", req, {
+        targetUserId: targetUser.id,
+        reason: "self_impersonation_blocked",
+      });
+      return res.status(400).json({
+        message: "Cannot generate an impersonation token for yourself",
+      });
+    }
+
+    if (!reason) {
+      logImpersonationAuditEvent("IMPERSONATION_TOKEN_REJECTED", req, {
+        targetUserId: targetUser.id,
+        reason: "missing_support_reason",
+      });
+      return res.status(400).json({
+        message: "A support reason is required for impersonation",
+      });
+    }
+
+    const email =
+      typeof targetUser.email === "string" && targetUser.email.trim()
+        ? targetUser.email
+        : `${targetUser.id}@impersonated.local`;
+    const expiresAt = new Date(
+      Date.now() + IMPERSONATION_TOKEN_TTL_MS,
+    ).toISOString();
+    const token = generateToken(
+      {
+        userId: targetUser.id,
+        email,
+        impersonation: {
+          active: true,
+          readOnly: true,
+          actorUserId: actor.id,
+          actorRole: actor.role,
+          targetUserId: targetUser.id,
+          reason,
+          issuedAt: new Date().toISOString(),
+        },
+      },
+      { expiresIn: IMPERSONATION_TOKEN_EXPIRES_IN },
+    );
+
+    logImpersonationAuditEvent("IMPERSONATION_TOKEN_ISSUED", req, {
+      targetUserId: targetUser.id,
+      supportReason: reason,
+      expiresAt,
+    });
+
+    return res.status(201).json({
+      message: "Read-only impersonation token generated",
+      token,
+      expiresAt,
+      impersonation: {
+        actorUserId: actor.id,
+        actorRole: actor.role,
+        targetUserId: targetUser.id,
+        readOnly: true,
+        reason,
+      },
+      guidance: READ_ONLY_IMPERSONATION_MESSAGE,
+    });
   },
 );
 
