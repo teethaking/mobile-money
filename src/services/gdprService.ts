@@ -4,8 +4,11 @@ import path from "node:path";
 import { v4 as uuid } from "uuid";
 import { Transaction, TransactionModel } from "../models/transaction";
 import { createZipFile } from "../utils/create-zip-file";
+import { logAuditEvent } from "../utils/log-audit-event";
+import { AuditLog, auditService } from "./auditlogService";
 import { TransactionService } from "./transanctionService";
-import { getUserById } from "./userService";
+import { getUserById, updateUserById, User } from "./userService";
+
 export class GDPRService {
   private txService: TransactionService;
 
@@ -58,7 +61,7 @@ export class GDPRService {
       .substring(0, 16);
   }
 
-  async anonymizeTransaction(tx: Transaction) {
+  anonymizeTransaction(tx: Transaction) {
     return {
       ...tx,
       phoneNumber: this.hashString(tx.phoneNumber),
@@ -67,22 +70,65 @@ export class GDPRService {
     };
   }
 
-  async anonymizeEmail(email: string) {
+  anonymizeEmail(email: string) {
     return `${this.hashString(email).slice(4, 8)}-${uuid()}@anonymized.local`;
   }
 
-  async anonymizePhoneNumber(phone: string) {
+  anonymizePhoneNumber(phone: string) {
     return this.hashString(phone);
   }
 
-  async anonymizeStellaAddress(addr: string) {
+  anonymizeStellaAddress(addr: string) {
     return this.hashString(addr);
   }
 
-  async anonymizeBackupCode(code: string[]) {
-    return code
-      .map((c) => this.hashString(c))
-      .join("")
-      .slice(3, 12);
+  anonymizeBackupCode(code: string[]) {
+    return code.map((c) => this.hashString(c));
   }
+
+  async purgeUserData(userId: string) {
+    try {
+      // Anonymize tx records
+      const transactions = await this.txService.findByUserId(userId);
+      for (const tx of transactions) {
+        const anonymizedTx = await this.anonymizeTransaction(tx);
+        // await updateTransaction(anonymizedTx);
+      }
+
+      // Purge PII from user profile
+      const user = await getUserById(userId);
+      const anonymizedUser = {
+        ...user,
+        phone_number: this.anonymizePhoneNumber(String(user?.phone_number)),
+        backup_codes: user?.backup_codes
+          ? this.anonymizeBackupCode(user?.backup_codes)
+          : [],
+      } as User;
+
+      await updateUserById(userId, anonymizedUser);
+
+      // Purge PII from audit logs - this uses MOCK at the moment
+
+      const auditLogs = await auditService.fetchAuditLogs(userId);
+      for (const log of auditLogs) {
+        const anonymizedLog: AuditLog = {
+          ...log,
+          action: this.hashString(log.action),
+        };
+
+        await auditService.updateAuditLog(anonymizedLog);
+      }
+
+      // Log erasure event
+      await logAuditEvent(userId, "RIGHT_TO_BE_FORGOTTEN_EXECUTED");
+
+      // Disable/deactivate user accout
+      await this.deactivateUserAccount(userId);
+    } catch (err) {
+      console.error("Erasure error:", err);
+      throw err;
+    }
+  }
+
+  private async deactivateUserAccount(userId: string) {}
 }
