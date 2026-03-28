@@ -1,3 +1,4 @@
+import "./tracer";
 import express, { NextFunction, Request, Response } from "express";
 import { IncomingMessage } from "http";
 import cors from "cors";
