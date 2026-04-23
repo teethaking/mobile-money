@@ -5,6 +5,7 @@ export const ACCOUNT_MERGE_QUEUE_NAME = "account-merge";
 
 export interface AccountMergeJobData {
   sourceSecret: string;
+  sourcePublicKey?: string;
   destinationPublicKey: string;
   inactivityDays: number;
   dryRun: boolean;
@@ -34,7 +35,8 @@ export async function addAccountMergeJob(
     jobId?: string;
   },
 ) {
-  const jobId = options?.jobId ?? `account-merge-${data.sourcePublicKey}-${Date.now()}`;
+  const jobSourceKey = data.sourcePublicKey ?? data.sourceSecret.slice(0, 10);
+  const jobId = options?.jobId ?? `account-merge-${jobSourceKey}-${Date.now()}`;
   return await accountMergeQueue.add("merge-account", data, {
     jobId,
     priority: options?.priority,

@@ -71,7 +71,7 @@ export function extractClientIp(req: Request): string {
     return Array.isArray(realIp) ? realIp[0].trim() : realIp.trim();
   }
 
-  return req.ip ?? req.socket?.remoteAddress ?? "";
+  return req.ip || req.socket?.remoteAddress || "";
 }
 
 // Augment Express Request so downstream handlers can read geo data

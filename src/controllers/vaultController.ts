@@ -33,6 +33,10 @@ export const createVault = async (req: Request, res: Response) => {
     }
 
     const validatedData = createVaultSchema.parse(req.body);
+    if (!validatedData.name) {
+      return res.status(400).json({ error: "Vault name is required" });
+    }
+
 
     // Check for duplicate vault name
     const existing = await vaultModel.findByUserAndName(userId, validatedData.name);
@@ -45,7 +49,9 @@ export const createVault = async (req: Request, res: Response) => {
 
     const vault = await vaultModel.create({
       userId,
-      ...validatedData,
+      name: validatedData.name,
+      description: validatedData.description,
+      targetAmount: validatedData.targetAmount,
     });
 
     res.status(201).json({
