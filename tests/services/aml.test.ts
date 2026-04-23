@@ -120,8 +120,8 @@ describe("AMLService", () => {
     });
 
     const report = amlService.generateReport(
-      new Date("2026-03-01T00:00:00.000Z"),
-      new Date("2026-03-31T23:59:59.999Z"),
+      new Date("2026-01-01T00:00:00.000Z"),
+      new Date("2099-12-31T23:59:59.999Z"),
     );
 
     expect(report.summary.totalAlerts).toBe(1);

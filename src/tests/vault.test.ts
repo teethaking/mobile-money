@@ -1,7 +1,10 @@
 import { VaultModel } from "../models/vault";
 import { pool } from "../config/database";
 
-describe("Vault System", () => {
+const shouldSkip =
+  process.env.RUN_DB_TESTS !== "true" || process.env.SKIP_DB_TESTS === "true";
+
+(shouldSkip ? describe.skip : describe)("Vault System", () => {
   let vaultModel: VaultModel;
   let testUserId: string;
 

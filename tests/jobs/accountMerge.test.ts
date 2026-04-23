@@ -22,7 +22,7 @@ describe("accountMerge helpers", () => {
   });
 
   it("returns null when no destination or issuer secret is configured", () => {
-    expect(resolveMergeDestinationPublicKey(undefined, undefined)).toBeNull();
+    expect(resolveMergeDestinationPublicKey("", "")).toBeNull();
   });
 
   it("marks inactive reserve-only accounts as mergeable", () => {

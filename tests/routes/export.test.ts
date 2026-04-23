@@ -6,6 +6,10 @@ import {
   createExportRoutes,
 } from "../../src/routes/export";
 
+jest.mock("../../src/middleware/rateLimit", () => ({
+  rateLimitExport: (_req: unknown, _res: unknown, next: () => void) => next(),
+}));
+
 describe("GET /api/transactions/export", () => {
   const adminKey = "test-admin-key";
 

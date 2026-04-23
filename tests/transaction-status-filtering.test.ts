@@ -42,7 +42,7 @@ describe("Transaction Status Filtering - Utility Functions", () => {
 
     it("should return empty array for empty string", () => {
       const result = parseStatusFilter("");
-      expect(result).toEqual(VALID_STATUSES);
+      expect(result).toEqual([]);
     });
 
     it("should filter out empty values", () => {

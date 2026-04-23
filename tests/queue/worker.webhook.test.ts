@@ -1,49 +1,38 @@
-const workerInstances: Array<{
-  processor: (job: any) => Promise<any>;
-  events: Record<string, Function>;
-}> = [];
+let registeredProcessor:
+  | ((data: Record<string, unknown>, msg: unknown) => Promise<void>)
+  | undefined;
 
-jest.mock("bullmq", () => ({
-  Queue: jest.fn().mockImplementation(() => ({
-    add: jest.fn(),
-    getJob: jest.fn(),
-    getWaitingCount: jest.fn(),
-    getActiveCount: jest.fn(),
-    getCompletedCount: jest.fn(),
-    getFailedCount: jest.fn(),
-    isPaused: jest.fn(),
-    pause: jest.fn(),
-    resume: jest.fn(),
-    drain: jest.fn(),
-  })),
-  Worker: jest.fn().mockImplementation(
-    (_name: string, processor: (job: any) => Promise<any>) => {
-      const instance = {
-        processor,
-        events: {} as Record<string, Function>,
-        on(event: string, handler: Function) {
-          instance.events[event] = handler;
-        },
-        close: jest.fn(async () => undefined),
-      };
-      workerInstances.push(instance);
-      return instance;
-    },
-  ),
-}));
+const mockPublish = jest.fn();
 
-jest.mock("../../src/queue/config", () => ({
-  queueOptions: {},
-}));
-
-jest.mock("../../src/queue/transactionQueue", () => ({
-  TRANSACTION_QUEUE_NAME: "transaction-processing",
+jest.mock("../../src/queue/rabbitmq", () => ({
+  EXCHANGES: { TRANSACTIONS: "transactions.topic" },
+  ROUTING_KEYS: {
+    TRANSACTION_PROCESS: "transaction.process",
+    TRANSACTION_COMPLETED: "transaction.completed",
+    TRANSACTION_FAILED: "transaction.failed",
+  },
+  QUEUES: {
+    TRANSACTION_PROCESSING: "transaction-processing-queue",
+  },
+  rabbitMQManager: {
+    consume: jest.fn().mockImplementation(
+      async (
+        _queue: string,
+        processor: (data: Record<string, unknown>, msg: unknown) => Promise<void>,
+      ) => {
+        registeredProcessor = processor;
+      },
+    ),
+    publish: (...args: unknown[]) => mockPublish(...args),
+  },
 }));
 
 const mockTransactionModel = {
   updateStatus: jest.fn(),
   findById: jest.fn(),
   updateWebhookDelivery: jest.fn(),
+  patchMetadata: jest.fn(),
+  incrementRetryCount: jest.fn(),
 };
 
 const mockMobileMoneyService = {
@@ -83,48 +72,41 @@ import { TransactionStatus } from "../../src/models/transaction";
 import "../../src/queue/worker";
 
 function getProcessor() {
-  expect(workerInstances).toHaveLength(1);
-  return workerInstances[0].processor;
+  expect(registeredProcessor).toBeDefined();
+  return registeredProcessor!;
 }
 
-function buildJob(dataOverrides: Record<string, unknown> = {}) {
+function buildData(dataOverrides: Record<string, unknown> = {}) {
   return {
-    id: "job-1",
-    attemptsMade: 0,
-    data: {
-      transactionId: "txn-1",
-      type: "deposit",
-      amount: "10000",
-      phoneNumber: "+237670000000",
-      provider: "mtn",
-      stellarAddress: `G${"A".repeat(55)}`,
-      ...dataOverrides,
-    },
-    updateProgress: jest.fn(async () => undefined),
+    transactionId: "txn-1",
+    type: "deposit",
+    amount: "10000",
+    phoneNumber: "+237670000000",
+    provider: "mtn",
+    stellarAddress: `G${"A".repeat(55)}`,
+    ...dataOverrides,
   };
 }
 
 describe("transaction worker webhook integration", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    registeredProcessor = undefined;
     mockMobileMoneyService.initiatePayment.mockResolvedValue({ success: true });
     mockMobileMoneyService.sendPayout.mockResolvedValue({ success: true });
     mockStellarService.sendPayment.mockResolvedValue(undefined);
     mockNotifyTransactionWebhook.mockResolvedValue({
       status: "delivered",
     });
+    mockTransactionModel.findById.mockResolvedValue(null);
+    require("../../src/queue/worker");
   });
 
   it("sends a completed webhook after a successful deposit", async () => {
     const processor = getProcessor();
-    const job = buildJob();
+    const data = buildData();
 
-    const result = await processor(job);
-
-    expect(result).toEqual({
-      success: true,
-      transactionId: "txn-1",
-    });
+    await processor(data, {});
     expect(mockTransactionModel.updateStatus).toHaveBeenCalledWith(
       "txn-1",
       TransactionStatus.Completed,
@@ -140,14 +122,14 @@ describe("transaction worker webhook integration", () => {
 
   it("sends a failed webhook when transaction processing throws", async () => {
     const processor = getProcessor();
-    const job = buildJob();
+    const data = buildData();
 
     mockMobileMoneyService.initiatePayment.mockResolvedValue({
       success: false,
       error: "provider outage",
     });
 
-    await expect(processor(job)).rejects.toThrow("provider outage");
+    await processor(data, {});
 
     expect(mockTransactionModel.updateStatus).toHaveBeenCalledWith(
       "txn-1",

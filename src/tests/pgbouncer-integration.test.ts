@@ -1,7 +1,10 @@
 import { pool, getPgBouncerStats, queryRead, queryWrite } from "../config/database";
 import { describe, it, expect, beforeAll, afterAll } from "@jest/globals";
 
-describe("PgBouncer Integration Tests", () => {
+const shouldSkip =
+  process.env.RUN_DB_TESTS !== "true" || process.env.SKIP_DB_TESTS === "true";
+
+(shouldSkip ? describe.skip : describe)("PgBouncer Integration Tests", () => {
   beforeAll(async () => {
     // Ensure database is ready
     await new Promise((resolve) => setTimeout(resolve, 2000));

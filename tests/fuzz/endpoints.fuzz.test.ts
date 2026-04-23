@@ -94,7 +94,18 @@ jest.mock("../../src/tracer", () => {});
 
 // External HTTP (currency service, etc.)
 jest.mock("axios", () => ({
-  default: { get: jest.fn().mockResolvedValue({ data: {} }), post: jest.fn().mockResolvedValue({ data: {} }) },
+  default: {
+    get: jest.fn().mockResolvedValue({ data: {} }),
+    post: jest.fn().mockResolvedValue({ data: {} }),
+    create: jest.fn(() => ({
+      get: jest.fn().mockResolvedValue({ data: {} }),
+      post: jest.fn().mockResolvedValue({ data: {} }),
+      interceptors: {
+        request: { use: jest.fn() },
+        response: { use: jest.fn() },
+      },
+    })),
+  },
   get:  jest.fn().mockResolvedValue({ data: {} }),
   post: jest.fn().mockResolvedValue({ data: {} }),
 }));

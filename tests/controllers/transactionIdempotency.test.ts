@@ -83,7 +83,15 @@ jest.mock("../../src/middleware/timeout", () => ({
 }));
 
 jest.mock("../../src/middleware/auth", () => ({
-  authenticateToken: (_req: unknown, _res: unknown, next: () => void) => next(),
+  authenticateToken: (req: any, _res: unknown, next: () => void) => {
+    req.jwtUser = { userId: "user-123", role: "user" };
+    next();
+  },
+}));
+
+jest.mock("../../src/middleware/checkAccountStatus", () => ({
+  checkAccountStatusStrict: (_req: unknown, _res: unknown, next: () => void) =>
+    next(),
 }));
 
 import { transactionRoutes } from "../../src/routes/transactions";
