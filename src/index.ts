@@ -6,7 +6,6 @@ import helmet from "helmet";
 // replaced express-rate-limit with our redis-backed middleware
 import compression from "compression";
 import dotenv from "dotenv";
-import spdy from 'spdy';
 import https from "https";
 import fs from "fs";
 import path from "path";
@@ -513,7 +512,8 @@ async function initializeRuntime(): Promise<void> {
       cert: fs.readFileSync(path.join(__dirname, "../certs/cert.pem")),
     };
 
-    const http2Server = spdy.createServer(sslOptions, app);
+    const spdy = await import("spdy");
+    const http2Server = spdy.default.createServer(sslOptions, app);
     http2Server.listen(PORT, () => {
       console.log(`HTTP/2 server running on https://localhost:${PORT}`);
     });

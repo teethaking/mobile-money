@@ -191,9 +191,9 @@ export const accountMergeWorker = new Worker<
       const account = await server.loadAccount(sourcePublicKey);
       const evaluation = evaluateAccountMergeCandidate(
         {
-          nativeBalance: getNativeBalance(account),
+          nativeBalance: getNativeBalance(account as unknown as StellarSdk.Horizon.ServerApi.AccountRecord),
           subentryCount: account.subentry_count,
-          hasNonNativeBalances: hasNonNativeBalances(account),
+          hasNonNativeBalances: hasNonNativeBalances(account as unknown as StellarSdk.Horizon.ServerApi.AccountRecord),
           lastActivityAt: await fetchLastActivityAt(server, sourcePublicKey),
         },
         inactivityDays,

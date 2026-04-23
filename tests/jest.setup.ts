@@ -7,3 +7,8 @@ process.env.JWT_SECRET ??= "test-jwt-secret";
 process.env.ADMIN_API_KEY ??= "test-admin-key";
 process.env.DB_ENCRYPTION_KEY ??= "development-encryption-key-32-chars-long";
 process.env.GEOLOCATION_API_KEY ??= "";
+
+
+jest.mock("spdy", () => ({
+  createServer: jest.fn(),
+}));

@@ -1,6 +1,12 @@
 import { Request, Response, NextFunction } from "express";
 import { pool } from "../config/database";
 
+declare module "express-serve-static-core" {
+  interface Request {
+    isNewDevice?: boolean;
+  }
+}
+
 // Utility to extract fingerprint from headers/params
 export function extractFingerprint(req: Request): string {
   // Example: combine user-agent, IP, and custom header
