@@ -1,24 +1,38 @@
 import request from "supertest";
-import app from "../../src/index";
-import { pool } from "../../src/config/database";
-import { redisClient } from "../../src/config/redis";
+import express from "express";
+import feesRouter from "../../src/routes/fees";
+import { feeService } from "../../src/services/feeService";
 
-// Mock the database and redis
-jest.mock("../../src/config/database");
-jest.mock("../../src/config/redis");
+jest.mock("../../src/services/feeService", () => ({
+  feeService: {
+    calculateFee: jest.fn(),
+    getActiveConfiguration: jest.fn(),
+  },
+}));
 
-const mockPool = pool as jest.Mocked<typeof pool>;
-const mockRedisClient = redisClient as jest.Mocked<typeof redisClient>;
+const mockFeeService = feeService as jest.Mocked<typeof feeService>;
+
+function createApp() {
+  const app = express();
+  app.use(express.json());
+  app.use("/api/fees", feesRouter);
+  return app;
+}
 
 describe("Fees API", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockRedisClient.isOpen = true;
   });
 
   describe("POST /api/fees/calculate", () => {
     it("should calculate fee using fallback when service fails", async () => {
-      const response = await request(app)
+      mockFeeService.calculateFee.mockResolvedValue({
+        fee: 150,
+        total: 10150,
+        configUsed: "env_fallback",
+      });
+
+      const response = await request(createApp())
         .post("/api/fees/calculate")
         .send({ amount: 10000 });
 
@@ -30,7 +44,7 @@ describe("Fees API", () => {
     });
 
     it("should return validation error for invalid amount", async () => {
-      const response = await request(app)
+      const response = await request(createApp())
         .post("/api/fees/calculate")
         .send({ amount: -100 });
 
@@ -42,9 +56,11 @@ describe("Fees API", () => {
 
   describe("GET /api/fees/configurations/active", () => {
     it("should return error when no active configuration found", async () => {
-      mockPool.query.mockResolvedValueOnce({ rows: [] });
+      mockFeeService.getActiveConfiguration.mockRejectedValueOnce(
+        new Error("No active fee configuration found"),
+      );
 
-      const response = await request(app)
+      const response = await request(createApp())
         .get("/api/fees/configurations/active");
 
       expect(response.status).toBe(500);

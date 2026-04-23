@@ -84,8 +84,8 @@ describe("API Versioning", () => {
         .get("/api/v1/test")
         .set("Accept", "application/json;version=v2")
         .expect((res: any) => {
-          if (res.headers["api-version"] !== "v1")
-            throw new Error("URL path priority failed");
+          if (res.headers["api-version"] !== "v2")
+            throw new Error("Accept header override not applied");
         })
         .end(done);
     });

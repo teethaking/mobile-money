@@ -97,7 +97,7 @@ describe("GeolocationService", () => {
       data: { status: "fail", message: "invalid query" },
     });
 
-    const result = await service.lookup("8.8.8.8");
+    const result = await service.lookup("1.1.1.1");
 
     expect(result).toMatchObject(UNKNOWN_LOCATION);
   });
@@ -105,7 +105,7 @@ describe("GeolocationService", () => {
   it("returns UNKNOWN_LOCATION when the API throws (network error)", async () => {
     mockedAxios.get = jest.fn().mockRejectedValue(new Error("ECONNREFUSED"));
 
-    const result = await service.lookup("8.8.8.8");
+    const result = await service.lookup("9.9.9.9");
 
     expect(result).toMatchObject(UNKNOWN_LOCATION);
   });
@@ -113,7 +113,7 @@ describe("GeolocationService", () => {
   it("returns UNKNOWN_LOCATION when the API times out", async () => {
     mockedAxios.get = jest.fn().mockRejectedValue(new Error("timeout of 3000ms exceeded"));
 
-    const result = await service.lookup("8.8.8.8");
+    const result = await service.lookup("8.8.4.4");
 
     expect(result).toMatchObject(UNKNOWN_LOCATION);
   });
@@ -138,8 +138,8 @@ describe("GeolocationService", () => {
       },
     });
 
-    await service.lookup("203.0.113.1");
-    await service.lookup("203.0.113.1"); // same anonymized key → cache hit
+    await service.lookup("203.0.114.1");
+    await service.lookup("203.0.114.1"); // same anonymized key → cache hit
 
     // API should only be called once
     expect(mockedAxios.get).toHaveBeenCalledTimes(1);

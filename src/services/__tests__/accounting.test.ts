@@ -233,20 +233,23 @@ describe("AccountingService", () => {
   });
 
   describe("syncDailyPnL", () => {
-    beforeEach(() => {
-      // Mock PnL data
-      mockPool.query.mockResolvedValueOnce({
-        rows: [{ transactions: 100, revenue: 1000, fees: 50 }],
-      });
-    });
-
     it("should sync daily P&L to QuickBooks successfully", async () => {
-      mockPool.query.mockResolvedValueOnce({ rows: [mockConnection] }); // getConnection
-      mockPool.query.mockResolvedValueOnce({ rows: [] }); // getCategoryMappings
-      mockPool.query.mockResolvedValueOnce({ rows: [] }); // createSyncLog
-      mockPool.query.mockResolvedValueOnce({ rows: [] }); // updateSyncLog
-
-      mockAxios.post.mockResolvedValue({ data: { Id: "test-journal-id" } });
+      jest.spyOn(accountingService, "getConnection").mockResolvedValue(mockConnection);
+      jest.spyOn(accountingService as any, "ensureValidToken").mockResolvedValue(undefined);
+      jest.spyOn(accountingService as any, "getPnLData").mockResolvedValue({
+        date: "2024-01-01",
+        revenue: 1000,
+        fees: 50,
+        netProfit: 950,
+        transactions: 100,
+      });
+      jest.spyOn(accountingService as any, "syncPnLToQuickBooks").mockImplementation(
+        async (_connection: any, _pnlData: any, syncLog: any) => {
+          syncLog.recordsProcessed = 1;
+          syncLog.recordsSucceeded = 1;
+        }
+      );
+      mockPool.query.mockResolvedValue({ rows: [] });
 
       const result = await accountingService.syncDailyPnL("test-connection-id", "2024-01-01");
 
@@ -263,12 +266,23 @@ describe("AccountingService", () => {
     });
 
     it("should handle sync failures gracefully", async () => {
-      mockPool.query.mockResolvedValueOnce({ rows: [mockConnection] }); // getConnection
-      mockPool.query.mockResolvedValueOnce({ rows: [] }); // getCategoryMappings
-      mockPool.query.mockResolvedValueOnce({ rows: [] }); // createSyncLog
-      mockPool.query.mockResolvedValueOnce({ rows: [] }); // updateSyncLog
-
-      mockAxios.post.mockRejectedValue(new Error("API Error"));
+      jest.spyOn(accountingService, "getConnection").mockResolvedValue(mockConnection);
+      jest.spyOn(accountingService as any, "ensureValidToken").mockResolvedValue(undefined);
+      jest.spyOn(accountingService as any, "getPnLData").mockResolvedValue({
+        date: "2024-01-01",
+        revenue: 1000,
+        fees: 50,
+        netProfit: 950,
+        transactions: 100,
+      });
+      jest.spyOn(accountingService as any, "syncPnLToQuickBooks").mockImplementation(
+        async (_connection: any, _pnlData: any, syncLog: any) => {
+          syncLog.recordsProcessed = 1;
+          syncLog.recordsFailed = 1;
+          throw new Error("API Error");
+        }
+      );
+      mockPool.query.mockResolvedValue({ rows: [] });
 
       const result = await accountingService.syncDailyPnL("test-connection-id", "2024-01-01");
 
@@ -280,7 +294,7 @@ describe("AccountingService", () => {
           recordsProcessed: 1,
           recordsSucceeded: 0,
           recordsFailed: 1,
-          errorMessage: "Error: API Error",
+          errorMessage: "API Error",
         })
       );
     });

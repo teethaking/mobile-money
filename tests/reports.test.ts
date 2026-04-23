@@ -4,11 +4,13 @@ import request from "supertest";
 const mockQuery = jest.fn();
 const mockRedisGet = jest.fn();
 const mockRedisSetEx = jest.fn();
+const mockCalculateFee = jest.fn();
 
 jest.mock("../src/config/database", () => ({
   pool: {
     query: (...args: unknown[]) => mockQuery(...args),
   },
+  queryRead: (...args: unknown[]) => mockQuery(...args),
 }));
 
 jest.mock("../src/config/redis", () => ({
@@ -16,6 +18,12 @@ jest.mock("../src/config/redis", () => ({
     isOpen: false,
     get: (...args: unknown[]) => mockRedisGet(...args),
     setEx: (...args: unknown[]) => mockRedisSetEx(...args),
+  },
+}));
+
+jest.mock("../src/services/feeService", () => ({
+  feeService: {
+    calculateFee: (...args: unknown[]) => mockCalculateFee(...args),
   },
 }));
 
@@ -82,6 +90,12 @@ describe("Reports Routes", () => {
     mockQuery.mockReset();
     mockRedisGet.mockReset();
     mockRedisSetEx.mockReset();
+    mockCalculateFee.mockReset();
+    mockCalculateFee.mockImplementation(async (amount: number) => ({
+      fee: amount * 0.02,
+      total: amount * 1.02,
+      configUsed: "test",
+    }));
     Object.assign(redisClient, { isOpen: false });
   });
 

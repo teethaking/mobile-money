@@ -6,6 +6,8 @@ import { startJobs } from "./scheduler";
 // Mock the database pool
 jest.mock("../config/database", () => ({
   pool: { query: jest.fn() },
+  queryWrite: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+  queryRead: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
 }));
 
 // Mock node-cron
@@ -14,13 +16,18 @@ jest.mock("node-cron", () => ({
   schedule: jest.fn(),
 }));
 
-import { pool } from "../config/database";
+import { pool, queryWrite } from "../config/database";
 import cron from "node-cron";
 
 const mockQuery = pool.query as jest.Mock;
+const mockQueryWrite = queryWrite as jest.Mock;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockQuery.mockReset();
+  mockQueryWrite.mockReset();
+  mockQuery.mockResolvedValue({ rows: [], rowCount: 0 });
+  mockQueryWrite.mockResolvedValue({ rows: [], rowCount: 0 });
   jest.spyOn(console, "log").mockImplementation(() => {});
   jest.spyOn(console, "warn").mockImplementation(() => {});
   jest.spyOn(console, "error").mockImplementation(() => {});
@@ -33,11 +40,11 @@ afterEach(() => {
 // --- cleanupJob ---
 describe("runCleanupJob", () => {
   it("deletes old transactions and logs count", async () => {
-    mockQuery
-      .mockResolvedValueOnce({ rows: [{ released: 4 }] })
-      .mockResolvedValueOnce({ rowCount: 3 });
+    mockQueryWrite.mockResolvedValueOnce({ rowCount: 4 });
+    mockQuery.mockResolvedValueOnce({ rowCount: 3 });
     await runCleanupJob();
-    expect(mockQuery).toHaveBeenCalledTimes(2);
+    expect(mockQueryWrite).toHaveBeenCalledTimes(1);
+    expect(mockQuery).toHaveBeenCalledTimes(1);
     expect(console.log).toHaveBeenCalledWith(
       expect.stringContaining("Deleted 3"),
     );
@@ -45,9 +52,8 @@ describe("runCleanupJob", () => {
 
   it("uses LOG_RETENTION_DAYS env var", async () => {
     process.env.LOG_RETENTION_DAYS = "30";
-    mockQuery
-      .mockResolvedValueOnce({ rows: [{ released: 0 }] })
-      .mockResolvedValueOnce({ rowCount: 0 });
+    mockQueryWrite.mockResolvedValueOnce({ rowCount: 0 });
+    mockQuery.mockResolvedValueOnce({ rowCount: 0 });
     await runCleanupJob();
     expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("30 days"));
     delete process.env.LOG_RETENTION_DAYS;

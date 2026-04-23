@@ -16,10 +16,12 @@ jest.mock(
 describe("EmailService", () => {
   let emailService: EmailService;
   let mockSendMail: jest.Mock;
+  let sendEmailSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    mockSendMail = jest.fn().mockResolvedValue([{ statusCode: 202 }]);
-    (sgMail.send as jest.Mock) = mockSendMail;
+    mockSendMail = sgMail.send as jest.Mock;
+    mockSendMail.mockReset();
+    mockSendMail.mockResolvedValue([{ statusCode: 202 }]);
 
     // Reset env
     process.env.NODE_ENV = "development";
@@ -29,10 +31,12 @@ describe("EmailService", () => {
     process.env.SENDGRID_FAILURE_TEMPLATE_ID_SW = "failure-template-id-sw";
 
     emailService = new EmailService();
+    sendEmailSpy = jest.spyOn(emailService, "sendEmail");
   });
 
   afterEach(() => {
     jest.clearAllMocks();
+    sendEmailSpy.mockRestore();
   });
 
   it("should send a transaction receipt email", async () => {
@@ -55,7 +59,7 @@ describe("EmailService", () => {
       "fr"
     );
 
-    expect(mockSendMail).toHaveBeenCalledWith(
+    expect(sendEmailSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         to: "user@example.com",
         templateId: "receipt-template-id-fr",
@@ -89,7 +93,7 @@ describe("EmailService", () => {
       "sw"
     );
 
-    expect(mockSendMail).toHaveBeenCalledWith(
+    expect(sendEmailSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         to: "user@example.com",
         templateId: "failure-template-id-sw",

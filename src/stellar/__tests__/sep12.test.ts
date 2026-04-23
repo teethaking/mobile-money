@@ -6,6 +6,9 @@ import KYCService, { KYCLevel, KYCStatus } from "../../services/kyc";
 
 // Mock KYC Service
 jest.mock("../../services/kyc");
+jest.mock("../../middleware/rateLimit", () => ({
+  sep12RateLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
+}));
 
 describe("SEP-12 KYC API", () => {
   let app: Express;

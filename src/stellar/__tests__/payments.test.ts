@@ -63,12 +63,11 @@ function mockServer(overrides: Partial<Record<string, jest.Mock>> = {}) {
     call: jest.fn().mockResolvedValue({ records: [makePathRecord()] }),
   });
 
-  const loadAccount = jest.fn().mockResolvedValue({
-    account_id:              senderKeypair.publicKey(),
-    sequence:                "1000",
-    incrementSequenceNumber: jest.fn(),
-    balances:                [],
-  });
+  const loadAccount = jest.fn().mockResolvedValue(
+    Object.assign(new StellarSdk.Account(senderKeypair.publicKey(), "1000"), {
+      balances: [],
+    }),
+  );
 
   return {
     strictReceivePaths,
@@ -106,9 +105,9 @@ describe("findPaymentPaths", () => {
     );
 
     expect(server.strictReceivePaths).toHaveBeenCalledWith(
-      xafAsset,
+      [xafAsset],
+      usdcAsset,
       "5",
-      [destinationAccount],
     );
     expect(paths).toHaveLength(1);
     expect(paths[0].destination_asset_code).toBe("USDC");
@@ -263,7 +262,7 @@ describe("executePathPayment", () => {
     const server = mockServer();
     mockGetStellarServer.mockReturnValue(server);
 
-    const intermediateAsset = new StellarSdk.Asset("XLM", undefined);
+    const intermediateAsset = StellarSdk.Asset.native();
 
     await executePathPayment(
       makeParams({ path: [intermediateAsset] }),

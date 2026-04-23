@@ -185,9 +185,10 @@ describe("generateToml()", () => {
       delete process.env.STELLAR_ASSET_CODE;
       delete process.env.STELLAR_ASSET_ISSUER;
       const toml = generateToml();
-      // Only XLM block should be present
-      const blocks = toml.split("[[CURRENCIES]]").filter(Boolean);
-      expect(blocks).toHaveLength(1);
+      const currencySections = toml.match(/\[\[CURRENCIES\]\]/g) ?? [];
+      expect(currencySections).toHaveLength(1);
+      expect(toml).toContain('code="XLM"');
+      expect(toml).not.toContain('code="USDC"');
     });
 
     it("includes extra assets from STELLAR_EXTRA_ASSETS", () => {
