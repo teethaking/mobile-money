@@ -202,7 +202,7 @@ describe("GraphQL Query Complexity", () => {
 
     const errors = runValidation(query, [
       createComplexityRule({
-        maximumComplexity: 10,
+        maximumComplexity: 5,
         estimators: [
           fieldExtensionsEstimator(),
           simpleEstimator({ defaultComplexity: 1 }),
@@ -210,7 +210,7 @@ describe("GraphQL Query Complexity", () => {
       }),
     ]);
     expect(errors.length).toBeGreaterThan(0);
-    expect(errors[0].message).toContain("too complex");
+    expect(errors[0].message).toContain("maximum complexity");
   });
 
   it("should reject queries exceeding max query nodes", () => {
@@ -227,17 +227,18 @@ describe("GraphQL Query Complexity", () => {
       }
     `;
 
-    const errors = runValidation(query, [
-      createComplexityRule({
-        maximumComplexity: 10000,
-        maxQueryNodes: 2,
-        estimators: [
-          fieldExtensionsEstimator(),
-          simpleEstimator({ defaultComplexity: 1 }),
-        ],
-      }),
-    ]);
-    expect(errors.length).toBeGreaterThan(0);
+    expect(() =>
+      runValidation(query, [
+        createComplexityRule({
+          maximumComplexity: 10000,
+          maxQueryNodes: 2,
+          estimators: [
+            fieldExtensionsEstimator(),
+            simpleEstimator({ defaultComplexity: 1 }),
+          ],
+        }),
+      ]),
+    ).toThrow(/maximum allowed number of nodes/i);
   });
 });
 

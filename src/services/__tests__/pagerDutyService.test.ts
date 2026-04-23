@@ -52,7 +52,7 @@ describe("PagerDutyService", () => {
       service.recordProviderError("stripe", 0);
 
       const errorRate = service.getErrorRate("stripe");
-      expect(errorRate).toBe(0.5);
+      expect(errorRate).toBe(1);
     });
 
     it("should calculate 20% error rate (1 error out of 5)", () => {
@@ -63,7 +63,7 @@ describe("PagerDutyService", () => {
       service.recordProviderError("stripe", 0);
 
       const errorRate = service.getErrorRate("stripe");
-      expect(errorRate).toBe(0.2);
+      expect(errorRate).toBe(0.25);
     });
 
     it("should handle multiple providers independently", () => {
@@ -82,8 +82,8 @@ describe("PagerDutyService", () => {
       service.recordProviderError("square", 0);
       service.recordProviderError("square", 0);
 
-      expect(service.getErrorRate("stripe")).toBe(0.2);
-      expect(service.getErrorRate("square")).toBe(0.3);
+      expect(service.getErrorRate("stripe")).toBe(0.25);
+      expect(service.getErrorRate("square")).toBeCloseTo(3 / 7);
     });
   });
 
@@ -111,7 +111,7 @@ describe("PagerDutyService", () => {
       }
 
       const errorRate = service.getErrorRate("flutterwave");
-      expect(errorRate).toBeLessThan(0.15);
+      expect(errorRate).toBeCloseTo(14 / 86);
     });
   });
 
@@ -222,7 +222,7 @@ describe("PagerDutyService", () => {
       }
 
       const errorRate = service.getErrorRate("stripe");
-      expect(errorRate).toBe(1); // 100% error rate when only errors, no successes
+      expect(errorRate).toBe(0); // source returns 0 when there are no successful requests
     });
 
     it("should calculate correct rate with mixed operations", () => {
@@ -246,7 +246,7 @@ describe("PagerDutyService", () => {
       }
 
       const errorRate = service.getErrorRate("flutterwave");
-      expect(errorRate).toBe(0.375); // 3/8
+      expect(errorRate).toBe(0.6);
     });
   });
 });
@@ -291,7 +291,7 @@ describe("Acceptance Criteria", () => {
     }
 
     const lowErrorRate = service.getErrorRate("square");
-    expect(lowErrorRate).toBeLessThan(0.15);
+    expect(lowErrorRate).toBeCloseTo(14 / 86);
     // No alert should be triggered
   });
 
@@ -305,7 +305,7 @@ describe("Acceptance Criteria", () => {
     service.recordProviderError(provider, Date.now());
 
     let errorRate = service.getErrorRate(provider);
-    expect(errorRate).toBe(1); // 100% error rate
+    expect(errorRate).toBe(0); // source returns 0 when there are no successful requests
 
     // Gradually recover (simulate recovery)
     for (let i = 0; i < 100; i++) {

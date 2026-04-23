@@ -39,29 +39,25 @@ const XLM     = StellarSdk.Asset.native();
 const userKeypair    = StellarSdk.Keypair.random();
 const sponsorKeypair = StellarSdk.Keypair.random();
 
-/** Minimal Horizon account with a single USDC trustline. */
+/** Minimal Horizon account with optional trustlines. */
 function makeAccount(
   publicKey: string,
   trustedAssets: StellarSdk.Asset[] = [],
 ): StellarSdk.Horizon.AccountResponse {
-  const balances: StellarSdk.Horizon.HorizonApi.BalanceLine[] = [
-    { asset_type: "native", balance: "10.0000000" } as StellarSdk.Horizon.HorizonApi.BalanceLine<"native">,
+  const account = new StellarSdk.Account(publicKey, "1") as unknown as StellarSdk.Horizon.AccountResponse;
+  (account as any).id = publicKey;
+  (account as any).account_id = publicKey;
+  (account as any).balances = [
+    { asset_type: "native", balance: "10.0000000" },
     ...trustedAssets.map((asset) => ({
       asset_type: asset.getCode().length <= 4 ? "credit_alphanum4" : "credit_alphanum12",
       asset_code: asset.getCode(),
       asset_issuer: asset.getIssuer(),
       balance: "0.0000000",
       limit: "922337203685.4775807",
-    } as StellarSdk.Horizon.HorizonApi.BalanceLine<"credit_alphanum4">)),
+    })),
   ];
-
-  return {
-    id: publicKey,
-    account_id: publicKey,
-    balances,
-    sequence: "1",
-    incrementSequenceNumber: () => {},
-  } as unknown as StellarSdk.Horizon.AccountResponse;
+  return account;
 }
 
 const TX_RESULT = { hash: "abc123", ledger: 42 };
@@ -129,7 +125,7 @@ describe("createTrustline", () => {
 
     const tx = mockSubmitTransaction.mock.calls[0][0] as StellarSdk.Transaction;
     const op = tx.operations[0] as StellarSdk.Operation.ChangeTrust;
-    expect(op.limit).toBe("1000");
+    expect(op.limit).toBe("1000.0000000");
   });
 });
 
@@ -182,7 +178,7 @@ describe("removeTrustline", () => {
 
     const tx = mockSubmitTransaction.mock.calls[0][0] as StellarSdk.Transaction;
     const op = tx.operations[0] as StellarSdk.Operation.ChangeTrust;
-    expect(op.limit).toBe("0");
+    expect(op.limit).toBe("0.0000000");
   });
 });
 

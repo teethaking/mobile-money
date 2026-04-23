@@ -93,6 +93,7 @@ describe("executePathPayment", () => {
   };
 
   beforeEach(() => {
+    jest.clearAllMocks();
     mockLoadAccount.mockResolvedValue(makeAccount());
     mockHasTrustline.mockResolvedValue(true);
   });

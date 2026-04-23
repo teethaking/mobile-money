@@ -64,12 +64,18 @@ jest.mock("../../src/services/stellar/stellarService", () => ({
 
 jest.mock("../../src/services/webhook", () => ({
   WebhookService: jest.fn().mockImplementation(() => ({})),
-  notifyTransactionWebhook: (...args: unknown[]) =>
-    mockNotifyTransactionWebhook(...args),
+  notifyTransactionWebhook: (...args: unknown[]) => mockNotifyTransactionWebhook(...args),
 }));
 
-import { TransactionStatus } from "../../src/models/transaction";
-import "../../src/queue/worker";
+function loadWorker() {
+  jest.isolateModules(() => {
+    require("../../src/queue/worker");
+  });
+}
+
+function getTransactionStatus() {
+  return require("../../src/models/transaction").TransactionStatus;
+}
 
 function getProcessor() {
   expect(registeredProcessor).toBeDefined();
@@ -91,6 +97,7 @@ function buildData(dataOverrides: Record<string, unknown> = {}) {
 describe("transaction worker webhook integration", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.resetModules();
     registeredProcessor = undefined;
     mockMobileMoneyService.initiatePayment.mockResolvedValue({ success: true });
     mockMobileMoneyService.sendPayout.mockResolvedValue({ success: true });
@@ -99,14 +106,16 @@ describe("transaction worker webhook integration", () => {
       status: "delivered",
     });
     mockTransactionModel.findById.mockResolvedValue(null);
-    require("../../src/queue/worker");
+    loadWorker();
   });
 
   it("sends a completed webhook after a successful deposit", async () => {
+    const TransactionStatus = getTransactionStatus();
     const processor = getProcessor();
     const data = buildData();
 
     await processor(data, {});
+
     expect(mockTransactionModel.updateStatus).toHaveBeenCalledWith(
       "txn-1",
       TransactionStatus.Completed,
@@ -121,6 +130,7 @@ describe("transaction worker webhook integration", () => {
   });
 
   it("sends a failed webhook when transaction processing throws", async () => {
+    const TransactionStatus = getTransactionStatus();
     const processor = getProcessor();
     const data = buildData();
 

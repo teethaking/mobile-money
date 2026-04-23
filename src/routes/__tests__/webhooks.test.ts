@@ -1,7 +1,23 @@
 import request from "supertest";
 import express from "express";
-import webhookRoutes from "../webhooks";
-import { SAMPLE_WEBHOOK_PAYLOAD } from "../webhooks";
+
+const mockFindById = jest.fn();
+const mockUpdateStatus = jest.fn();
+
+jest.mock("../../models/transaction", () => ({
+  TransactionStatus: {
+    PENDING: "pending",
+    COMPLETED: "completed",
+    FAILED: "failed",
+    CANCELLED: "cancelled",
+  },
+  TransactionModel: jest.fn().mockImplementation(() => ({
+    findById: mockFindById,
+    updateStatus: mockUpdateStatus,
+  })),
+}));
+
+import webhookRoutes, { SAMPLE_WEBHOOK_PAYLOAD } from "../webhooks";
 
 describe("Webhooks Routes", () => {
   let app: express.Application;
@@ -13,6 +29,8 @@ describe("Webhooks Routes", () => {
     
     // Set test environment variables
     process.env.WEBHOOK_SECRET = "test-webhook-secret";
+    mockFindById.mockReset();
+    mockUpdateStatus.mockReset();
   });
 
   afterEach(() => {
@@ -160,6 +178,8 @@ describe("Webhooks Routes", () => {
     });
 
     it("should return 404 for non-existent transaction", async () => {
+      mockFindById.mockResolvedValue(null);
+
       const payload = {
         ...SAMPLE_WEBHOOK_PAYLOAD,
         transaction_id: "non-existent-id"
@@ -182,6 +202,12 @@ describe("Webhooks Routes", () => {
     });
 
     it("should accept valid webhook payload", async () => {
+      mockFindById.mockResolvedValue({
+        id: "test_txn_123",
+        status: "pending",
+      });
+      mockUpdateStatus.mockResolvedValue(undefined);
+
       const payload = {
         event_id: "evt_test123",
         event_type: "transaction.completed",
@@ -214,9 +240,16 @@ describe("Webhooks Routes", () => {
       expect(response.body.event_id).toBe("evt_test123");
       expect(response.body.transaction_id).toBe("test_txn_123");
       expect(response.body).toHaveProperty("processed_at");
+      expect(mockUpdateStatus).toHaveBeenCalledWith("test_txn_123", "completed");
     });
 
     it("should handle valid webhook with optional fields", async () => {
+      mockFindById.mockResolvedValue({
+        id: "test_txn_456",
+        status: "pending",
+      });
+      mockUpdateStatus.mockResolvedValue(undefined);
+
       const payload = {
         event_id: "evt_test456",
         event_type: "transaction.failed",
@@ -254,6 +287,7 @@ describe("Webhooks Routes", () => {
       expect(response.body.success).toBe(true);
       expect(response.body.event_id).toBe("evt_test456");
       expect(response.body.transaction_id).toBe("test_txn_456");
+      expect(mockUpdateStatus).toHaveBeenCalledWith("test_txn_456", "failed");
     });
   });
 });

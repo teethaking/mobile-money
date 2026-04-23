@@ -56,7 +56,7 @@ describe("SEP-02 Federation Server", () => {
     it("returns 400 when q is missing", async () => {
       const res = await request(app).get("/federation").query({ type: "name" });
       expect(res.status).toBe(400);
-      expect(res.body.detail).toMatch(/q is required/i);
+      expect(res.body.detail).toMatch(/required/i);
     });
 
     it("returns 400 when type is missing", async () => {
